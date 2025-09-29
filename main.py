@@ -36,17 +36,23 @@ def initialize_app():
 def setup_llm():
     """Setup LLM configuration and validate API key."""
     try:
-        from langchain_openai import ChatOpenAI
+        import llm_client
         
-        if not config.OPENAI_API_KEY or config.OPENAI_API_KEY == "your_openai_api_key_here":
-            st.error("Please set your OPENAI_API_KEY in the .env file")
+        # Check provider configuration
+        provider = config.LLM_PROVIDER.lower()
+        if provider == "openai":
+            if not config.OPENAI_API_KEY or config.OPENAI_API_KEY == "your_openai_api_key_here":
+                st.error("Please set your OPENAI_API_KEY in the .env file")
+                st.stop()
+        elif provider == "hf":
+            if not config.HF_TOKEN or config.HF_TOKEN == "your_hf_token_here":
+                st.error("Please set your HF_TOKEN in the .env file")
+                st.stop()
+        else:
+            st.error(f"Invalid LLM_PROVIDER: {provider}. Use 'openai' or 'hf'")
             st.stop()
         
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        llm = llm_client.get_llm()
         
         return llm
         

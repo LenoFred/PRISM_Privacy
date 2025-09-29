@@ -12,6 +12,14 @@ load_dotenv()
 # LLM Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+
+# Hugging Face Configuration
+HF_TOKEN = os.getenv("HF_TOKEN")
+HF_MODEL = os.getenv("HF_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct")
+
+# LLM Provider Selection
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "hf"
+
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 
 # Sensitive Data Templates
@@ -91,18 +99,18 @@ AGENT_ACL = {
 
 # Semantic Minimization Prompt
 SEMANTIC_MINIMIZATION_PROMPT = """
-You must transform the following sensitive medical query into a privacy-preserving version while maintaining utility for treatment recommendations.
+Transform the following sensitive medical query into a privacy-preserving version while maintaining utility for treatment recommendations.
 
 RULES:
 1. Replace the specific medical condition with a general category (e.g., "Chronic Ailment Category", "Genetic Predisposition", "Metabolic Disorder")
 2. Replace the specific patient ID with a non-invertible hash-like token (e.g., "PID_Hashed", "PID_Anonymous")
 3. Keep the treatment ID EXACTLY as provided (this is essential for utility)
 4. Maintain the request structure and intent
+5. OUTPUT ONLY the transformed query - NO explanations, comments, or analysis
 
 Original Query: {original_query}
 
-Transform this into a privacy-preserving version:
-"""
+Transformed Query:"""
 
 # Agent Prompts
 AGENT_A_PROMPT = """

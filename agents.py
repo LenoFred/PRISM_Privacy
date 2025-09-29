@@ -5,11 +5,11 @@ Implements the three-agent workflow with state scrubbing capabilities.
 
 from typing import TypedDict, Annotated, List, Literal
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 import operator
 import config
 import prism_logic
+import llm_client
 
 
 class AgentState(TypedDict):
@@ -51,12 +51,8 @@ def input_encoder_sm(state: AgentState) -> AgentState:
     This is the core thesis contribution.
     """
     try:
-        # Initialize LLM
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        # Initialize LLM using unified client
+        llm = llm_client.get_llm()
         
         user_input = state["full_secret_s"]
         mode = state["mode"]
@@ -131,12 +127,8 @@ def treatment_agent(state: AgentState) -> AgentState:
     Processes the available context (restricted by RI) and generates treatment recommendations.
     """
     try:
-        # Initialize LLM
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        # Initialize LLM using unified client
+        llm = llm_client.get_llm()
         
         # Apply Restricted Information (RI) filtering
         filtered_state = prism_logic.restricted_information_ri(state, "Agent_B")
@@ -178,12 +170,8 @@ def recomposition_agent(state: AgentState) -> AgentState:
     Provides final pricing and recommendations while maintaining privacy constraints.
     """
     try:
-        # Initialize LLM
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        # Initialize LLM using unified client
+        llm = llm_client.get_llm()
         
         # Apply Restricted Information (RI) filtering
         filtered_state = prism_logic.restricted_information_ri(state, "Agent_C")

@@ -4,25 +4,29 @@ Contains adversarial probing and utility measurement logic.
 """
 
 from typing import Dict, List, Tuple
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 import config
+import llm_client
 from agents import AgentState
 
 
-def run_adversary_prober(state: AgentState, llm: ChatOpenAI) -> str:
+def run_adversary_prober(state: AgentState, llm=None) -> str:
     """
     Simulates the Adversary's attack by prompting an LLM based ONLY on the 
     messages (the Reflection Log) in the state.
     
     Args:
         state: The complete agent state after execution
-        llm: LLM instance for adversarial probing
+        llm: LLM instance for adversarial probing (optional, will create one if not provided)
         
     Returns:
         str: Adversary's reconstruction attempt
     """
     try:
+        # Get LLM instance if not provided
+        if llm is None:
+            llm = llm_client.get_llm()
+            
         # Extract log content from messages
         log_content = "\n".join([msg.content for msg in state["messages"]])
         
@@ -40,19 +44,23 @@ def run_adversary_prober(state: AgentState, llm: ChatOpenAI) -> str:
         return "Failure,Failure"
 
 
-def evaluate_task_success(final_output: str, expected_treatment_id: str, llm: ChatOpenAI) -> bool:
+def evaluate_task_success(final_output: str, expected_treatment_id: str, llm=None) -> bool:
     """
     Evaluate if the final output successfully completes the medical treatment task.
     
     Args:
         final_output: Agent C's final output
         expected_treatment_id: The treatment ID that should be mentioned
-        llm: LLM instance for evaluation
+        llm: LLM instance for evaluation (optional, will create one if not provided)
         
     Returns:
         bool: True if task was successful
     """
     try:
+        # Get LLM instance if not provided
+        if llm is None:
+            llm = llm_client.get_llm()
+            
         # Create TSR evaluation prompt
         judge_prompt = config.TSR_JUDGE_PROMPT.format(
             final_output=final_output,
@@ -99,7 +107,7 @@ def calculate_exfiltration_success(adversary_output: str, ground_truth_condition
     return condition_found and patient_id_found
 
 
-def run_single_experiment(full_secret: str, mode: str, graph, llm: ChatOpenAI) -> Tuple[bool, bool, Dict]:
+def run_single_experiment(full_secret: str, mode: str, graph, llm=None) -> Tuple[bool, bool, Dict]:
     """
     Run a single experiment trial.
     
@@ -190,7 +198,7 @@ def calculate_metrics(results: List[Dict]) -> Dict[str, float]:
     }
 
 
-def run_batch_experiments(n_trials: int, mode: str, graph, llm: ChatOpenAI) -> List[Dict]:
+def run_batch_experiments(n_trials: int, mode: str, graph, llm=None) -> List[Dict]:
     """
     Run a batch of N experiments for a given mode.
     
@@ -198,7 +206,7 @@ def run_batch_experiments(n_trials: int, mode: str, graph, llm: ChatOpenAI) -> L
         n_trials: Number of trials to run
         mode: Experiment mode ("BASELINE" or "PRISM")
         graph: Compiled LangGraph workflow
-        llm: LLM instance
+        llm: LLM instance (optional, will create one if not provided)
         
     Returns:
         List of detailed results for each trial
@@ -245,12 +253,8 @@ def test_adversary_prober():
     print("Testing Adversary Prober...")
     
     try:
-        # Initialize LLM
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        # Initialize LLM using unified client
+        llm = llm_client.get_llm()
         
         # Create test state with obvious leakage
         from langchain_core.messages import AIMessage
@@ -287,12 +291,8 @@ def test_task_success_evaluation():
     print("Testing Task Success Evaluation...")
     
     try:
-        # Initialize LLM
-        llm = ChatOpenAI(
-            model=config.OPENAI_MODEL,
-            temperature=config.TEMPERATURE,
-            api_key=config.OPENAI_API_KEY
-        )
+        # Initialize LLM using unified client
+        llm = llm_client.get_llm()
         
         # Test successful output
         successful_output = "Based on the chronic ailment category, the treatment RX_Alpha_7 is recommended. The estimated cost is $250 per month. Please schedule a follow-up appointment."

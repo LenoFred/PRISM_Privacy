@@ -4,12 +4,12 @@ Contains the two core thesis contributions: Semantic Minimization (SM) and Restr
 """
 
 from typing import Dict, Any
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 import config
+import llm_client
 
 
-def semantic_minimization_sm(prompt: str, llm: ChatOpenAI) -> str:
+def semantic_minimization_sm(prompt: str, llm=None) -> str:
     """
     SM Component: Semantic Minimization
     
@@ -18,12 +18,16 @@ def semantic_minimization_sm(prompt: str, llm: ChatOpenAI) -> str:
     
     Args:
         prompt: The initial sensitive user prompt (containing P1, P2, P3)
-        llm: The LLM instance for performing the transformation
+        llm: LLM instance (optional, will create one if not provided)
         
     Returns:
         str: A fragmented string that preserves utility but breaks semantic linkage
     """
     try:
+        # Get LLM instance if not provided
+        if llm is None:
+            llm = llm_client.get_llm()
+            
         # Create the semantic minimization prompt
         minimization_prompt = config.SEMANTIC_MINIMIZATION_PROMPT.format(
             original_query=prompt
@@ -137,19 +141,31 @@ def validate_semantic_minimization(original: str, minimized: str) -> bool:
     Returns:
         bool: True if sensitive info was properly minimized
     """
+    # Convert to lowercase for comparison
+    minimized_lower = minimized.lower()
+    
     # Check that specific conditions are not present
     for condition in config.SENSITIVE_CONDITIONS:
-        if condition in minimized:
+        if condition.lower() in minimized_lower:
+            print(f"❌ Validation failed: Found sensitive condition '{condition}' in minimized text")
             return False
     
     # Check that specific patient IDs are not present
     for patient_id in config.PATIENT_IDS:
-        if patient_id in minimized:
+        if patient_id.lower() in minimized_lower:
+            print(f"❌ Validation failed: Found sensitive patient ID '{patient_id}' in minimized text")
             return False
     
     # Check that treatment IDs are still present (utility preservation)
-    has_treatment = any(treatment in minimized for treatment in config.TREATMENT_IDS)
+    has_treatment = any(treatment.lower() in minimized_lower for treatment in config.TREATMENT_IDS)
     
+    if not has_treatment:
+        print(f"❌ Validation failed: No treatment ID found in minimized text")
+        print(f"Expected one of: {config.TREATMENT_IDS}")
+        print(f"Minimized text: {minimized}")
+        return False
+    
+    print(f"✅ Validation passed: Sensitive info removed, treatment ID preserved")
     return has_treatment
 
 

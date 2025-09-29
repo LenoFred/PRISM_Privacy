@@ -20,6 +20,7 @@ prism_experiment/
 ├── metrics.py           # ER and TSR calculation functions
 ├── config.py            # Configuration and data templates
 ├── prism_logic.py       # Core PRISM mechanism (RI + SM)
+├── llm_client.py        # Unified LLM client (OpenAI/HuggingFace)
 ├── requirements.txt     # Python dependencies
 ├── .env                 # API keys (create from template)
 └── README.md           # This file
@@ -35,13 +36,27 @@ pip install -r requirements.txt
 
 ### 2. Configure API Key
 
-Create a `.env` file with your OpenAI API key:
+Create a `.env` file with your preferred LLM provider:
 
+**Option 1: OpenAI (Default)**
 ```env
+LLM_PROVIDER=openai
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-3.5-turbo
 TEMPERATURE=0.1
 ```
+
+**Option 2: Hugging Face**
+```env
+LLM_PROVIDER=hf
+HF_TOKEN=your_huggingface_token_here
+HF_MODEL=meta-llama/Meta-Llama-3-8B-Instruct
+TEMPERATURE=0.1
+```
+
+#### Getting API Keys:
+- **OpenAI**: Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **Hugging Face**: Get your token from [HuggingFace Settings](https://huggingface.co/settings/tokens)
 
 ### 3. Run the Application
 
@@ -49,7 +64,31 @@ TEMPERATURE=0.1
 streamlit run main.py
 ```
 
-### 4. Run Experiments
+### 4. Switching Between Providers
+
+To switch between OpenAI and Hugging Face:
+
+1. Update the `LLM_PROVIDER` setting in your `.env` file:
+   ```env
+   # For OpenAI
+   LLM_PROVIDER=openai
+   
+   # For Hugging Face
+   LLM_PROVIDER=hf
+   ```
+
+2. Ensure the corresponding API key is set
+3. Restart the application
+
+### 5. Testing Your Setup
+
+Before running the full experiment, test your configuration:
+
+```bash
+python test_system.py
+```
+
+### 6. Run Experiments
 
 1. Open the Streamlit interface in your browser
 2. Configure the number of trials (default: 20)

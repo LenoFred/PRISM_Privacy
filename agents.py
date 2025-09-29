@@ -3,11 +3,23 @@ Core LangGraph State definition, Nodes, and Graph compilation.
 Implements the three-agent workflow with state scrubbing capabilities.
 """
 
-from typing import TypedDict, Annotated, List, Literal
+import sys
+from typing import TypedDict, List
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
 import operator
 import config
+
+# Python 3.8 compatibility for Annotated and Literal
+if sys.version_info >= (3, 9):
+    from typing import Annotated
+else:
+    from typing_extensions import Annotated
+
+if sys.version_info >= (3, 8):
+    from typing import Literal
+else:
+    from typing_extensions import Literal
 import prism_logic
 import llm_client
 

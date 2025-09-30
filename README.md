@@ -240,17 +240,6 @@ prism_experiment/
     └── session_summaries/
 ```
 
-## Citation
-
-```bibtex
-@article{
-  title={PRISM: Privacy in Reflective Multi-Agent Systems - Solving the Puzzle Piece Privacy Problem},
-  author={Allen Ikheovha Frederick},
-  year={2025},
-  note={Msc. Thesis Research - Empirical validation available in experiment logs}
-}
-```
-
 ## License
 
 This research implementation is provided for academic evaluation and peer review.

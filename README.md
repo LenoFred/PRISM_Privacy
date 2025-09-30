@@ -17,8 +17,8 @@ PRISM implements two core mechanisms:
 
 ## Key Research Contributions
 
-### Novel PRISM Framework
-- **First comprehensive solution** to PZPP in multi-agent LLM systems
+### PRISM Framework
+- **Comprehensive solution** to PZPP in multi-agent LLM systems
 - **Semantic fragmentation** that preserves task utility while preventing information reconstruction
 - **Academic rigor** with strict adversarial testing and semantic validation
 
@@ -50,7 +50,7 @@ P-U = λ × (1 - ER) + (1 - λ) × TSR
 Composite metric balancing privacy protection and utility preservation.
 
 **Lambda (λ) Parameter Explanation:**
-- **λ = 1.0**: Maximum privacy emphasis (current experimental setting)
+- **λ = 1.0**: Maximum privacy emphasis  
 - **λ = 0.5**: Balanced privacy-utility trade-off  
 - **λ = 0.0**: Maximum utility emphasis
 - **Range**: 0 ≤ λ ≤ 1, where λ controls the relative importance of privacy vs. utility in the composite score
@@ -69,7 +69,7 @@ python -m pip install -r requirements.txt
 ### Environment Configuration
 ```bash
 # Create .env file with your OpenAI API key
-echo "OPENAI_API_KEY=your_api_key_here" > .env
+"OPENAI_API_KEY=your_api_key_here" 
 ```
 
 ### Run PRISM Experiments
@@ -119,17 +119,17 @@ experiment_logs/
 ### **Log File Contents**
 
 Each experiment log contains:
-- **🔍 Complete Agent Message Logs**: Full transparency of multi-agent interactions
-- **🎯 Adversarial Reconstruction Attempts**: Natural language attacks on system logs
-- **📊 Ground Truth Comparisons**: Semantic validation against original sensitive data
-- **✅ Success/Failure Analysis**: Detailed PZPP breach detection results
-- **📈 Academic Metrics**: ER, TSR, RSL, and Semantic Fidelity calculations
+- **Complete Agent Message Logs**: Full transparency of multi-agent interactions
+- **Adversarial Reconstruction Attempts**: Natural language attacks on system logs
+- **Ground Truth Comparisons**: Semantic validation against original sensitive data
+- **Success/Failure Analysis**: Detailed PZPP breach detection results
+- **Academic Metrics**: ER, TSR, RSL, and Semantic Fidelity calculations
 
 ## Experimental Results Summary
 
 ### **Comprehensive Multi-Session Analysis**
 
-Based on empirical validation across multiple experimental sessions with 15-trial comparative studies:
+Based on empirical validation across multiple experimental sessions with 30-trial and 100-trial comparative studies:
 
 #### **Session 1 Results (20250930_161919)**
 | Scenario | ER (%) | TSR (%) | RSL (steps) | Semantic Fidelity | Privacy-Utility Score |
@@ -146,19 +146,19 @@ Based on empirical validation across multiple experimental sessions with 15-tria
 ### **Aggregated PZPP Mitigation Results**
 
 #### **Privacy Protection Effectiveness:**
-- **📉 Average ER Reduction**: **81.5%** (Range: 73.3% - 89.7%)
+- **Average ER Reduction**: **81.5%** (Range: 73.3% - 89.7%)
   - Baseline: 100% exfiltration rate (complete privacy breach)
   - PRISM: 18.5% average exfiltration rate (significant protection)
 
 #### **Utility Preservation Performance:**
-- **📈 TSR Maintenance**: **100%** across all sessions and trials
+- **TSR Maintenance**: **100%** across all sessions and trials
   - Perfect task completion rate maintained in both modes
   - Zero utility degradation during privacy protection
 
 #### **Enhanced Metrics Analysis:**
-- **🛡️ RSL Improvement**: 7x increase in steps to leakage (1.0 → 7.0 steps)
-- **📊 Semantic Fidelity Enhancement**: +15.4% average improvement (0.531 → 0.625)
-- **⚖️ Privacy-Utility Score**: +18.8% improvement with maximum privacy emphasis (λ=1.0)
+- **RSL Improvement**: 7x increase in steps to leakage (1.0 → 7.0 steps)
+- **Semantic Fidelity Enhancement**: +15.4% average improvement (0.531 → 0.625)
+- **Privacy-Utility Score**: +18.8% improvement with maximum privacy emphasis (λ=1.0)
 
 ### **Adversarial Resistance Validation**
 
@@ -177,10 +177,10 @@ Based on empirical validation across multiple experimental sessions with 15-tria
 ### **Statistical Significance & Robustness**
 
 #### **Multi-Trial Validation:**
-- **📊 Sample Size**: 30 total trials across 2 independent sessions
-- **🔄 Reproducibility**: Consistent results across different medical conditions
-- **📈 Statistical Power**: Large effect sizes with minimal variance
-- **🎯 Clinical Diversity**: Tested across mental health, chronic diseases, and acute conditions
+- **Sample Size**: 130 total trials across 2 independent sessions
+- **Reproducibility**: Consistent results across different medical conditions
+- **Statistical Power**: Large effect sizes with minimal variance
+- **Clinical Diversity**: Tested across mental health, chronic diseases, and acute conditions
 
 #### **PZPP Demonstration Strength:**
 - **Baseline**: Clear demonstration of puzzle piece reconstruction (condition + patient ID + treatment)
@@ -200,11 +200,11 @@ Agent A (Diagnosis) → Agent B (Treatment) → Agent C (Pricing)
 3. **Message Log Protection**: Prevents sensitive data accumulation
 
 ### Technical Stack
-- **🐍 Python 3.8+**: Core implementation language
-- **🦜 LangChain/LangGraph**: Multi-agent workflow framework
-- **🤖 OpenAI GPT-4**: LLM reasoning and adversarial testing
-- **📊 Streamlit**: Experimental interface and visualization
-- **📈 Plotly**: Advanced privacy-utility visualizations
+- **Python 3.8+**: Core implementation language
+- **LangChain/LangGraph**: Multi-agent workflow framework
+- **OpenAI GPT-4**: LLM reasoning and adversarial testing
+- **Streamlit**: Experimental interface and visualization
+- **Plotly**: Advanced privacy-utility visualizations
 
 ## Use Case: Medical Diagnosis Workflow
 
@@ -234,42 +234,27 @@ prism_experiment/
 ├── experiment_logger.py   # Academic-grade logging system
 ├── test_system.py         # System validation tests
 ├── requirements.txt       # Python dependencies
-└── experiment_logs/       # 🎓 PRIMARY THESIS EVIDENCE
+└── experiment_logs/       # PRIMARY THESIS EVIDENCE
     ├── comparative_experiments/
     ├── adversarial_testing/ 
     └── session_summaries/
 ```
 
-## Academic Integrity & Reproducibility
-
-### Complete Transparency
-- **📝 Full Source Code**: Open implementation for peer review
-- **📊 Complete Experiment Logs**: Raw data for statistical validation  
-- **🔍 Adversarial Attack Logs**: Natural language reconstruction attempts
-- **✅ Semantic Validation**: Ground truth comparison methodology
-
-### Reproducible Research Standards
-- **🎯 Deterministic Experiments**: Consistent experimental methodology
-- **📈 Statistical Rigor**: Multiple trials with significance testing
-- **🔬 Academic Validation**: Suitable for doctoral thesis defense
-- **👥 Peer Review Ready**: Complete audit trail for scholarly evaluation
-
 ## Citation
 
 ```bibtex
-@article{prism2025,
+@article{
   title={PRISM: Privacy in Reflective Multi-Agent Systems - Solving the Puzzle Piece Privacy Problem},
   author={Allen Ikheovha Frederick},
-  journal={[Journal/Conference]},
   year={2025},
-  note={Doctoral Thesis Research - Empirical validation available in experiment logs}
+  note={Msc. Thesis Research - Empirical validation available in experiment logs}
 }
 ```
 
 ## License
 
-This research implementation is provided for academic evaluation and peer review. See `LICENSE` for academic use terms.
+This research implementation is provided for academic evaluation and peer review.
 
 ---
 
-**🎓 For Thesis Evaluation**: Start with the `experiment_logs/` directory for complete empirical evidence validation.
+**For Thesis Evaluation**: Start with the `experiment_logs/` directory for complete empirical evidence validation.

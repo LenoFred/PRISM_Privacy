@@ -15,6 +15,7 @@ import config
 import agents
 import metrics
 import prism_logic
+from experiment_logger import get_experiment_logger
 
 
 def initialize_app():
@@ -31,6 +32,8 @@ def initialize_app():
         st.session_state.results = {}
     if "experiment_running" not in st.session_state:
         st.session_state.experiment_running = False
+    if "adversarial_results" not in st.session_state:
+        st.session_state.adversarial_results = []
 
 
 def setup_llm():
@@ -74,6 +77,16 @@ def create_sidebar():
         help="Number of experimental trials to run for each mode (Baseline vs PRISM)"
     )
     
+    # Add Dynamic Leakage Penalty (λ) Control
+    lambda_val = st.sidebar.slider(
+        "Leakage Penalty (λ):",
+        min_value=0.0,
+        max_value=5.0,
+        value=1.0,
+        step=0.1,
+        help="Dynamic penalty weight for privacy leakage in P-U metric calculation. Higher values penalize privacy breaches more severely."
+    )
+    
     # Adversarial Testing Panel
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔴 Adversarial Testing")
@@ -111,7 +124,7 @@ def create_sidebar():
     st.sidebar.write("**Treatment IDs:**", config.TREATMENT_IDS[:3], "...")
     st.sidebar.write("**Patient IDs:**", config.PATIENT_IDS[:3], "...")
     
-    return n_trials
+    return n_trials, lambda_val
 
 
 def display_header():
@@ -123,9 +136,9 @@ def display_header():
     """)
 
 
-def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
+def run_experiment_mode(mode: str, n_trials: int, llm, graph, lambda_val: float = 1.0) -> Dict:
     """
-    Run experiment for a specific mode with API error handling.
+    Run experiment for a specific mode with API error handling and comprehensive logging.
     
     Args:
         mode: "BASELINE" or "PRISM"
@@ -136,6 +149,9 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
     Returns:
         Dict containing experiment results and metrics
     """
+    # Initialize experiment logger
+    logger = get_experiment_logger()
+    
     # Progress tracking
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -163,13 +179,84 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
         
         # Run single experiment with API error handling
         try:
+            print(f"\n{'='*80}")
+            print(f"🧪 STARTING TRIAL {trial + 1}/{n_trials} - MODE: {mode}")
+            print(f"Generated Secret: {full_secret[:100]}...")
+            print(f"Expected Treatment: {treatment_id}, Patient: {patient_id}, Condition: {condition}")
+            
             exfiltration_success, task_success, detailed_result = metrics.run_single_experiment(
-                full_secret, mode, graph, llm
+                full_secret, mode, graph, llm, lambda_val, trial_num=trial+1, verbose=True
             )
+            
+            # COMPREHENSIVE SERVER-SIDE LOGGING - FULL DETAILS
+            print(f"\n📊 TRIAL {trial + 1} COMPREHENSIVE RESULTS:")
+            print(f"  Mode: {mode}")
+            print(f"  TSR Check: {'SUCCESS' if task_success else 'FAILURE'}")
+            print(f"  ER Test: {'EXFILTRATION SUCCESS' if exfiltration_success else 'NO EXFILTRATION'}")
+            
+            # FULL FINAL OUTPUT - UNTRUNCATED
+            final_output = detailed_result.get("final_output", "")
+            print(f"\n🔹 COMPLETE FINAL OUTPUT:")
+            print(f"{'─'*60}")
+            print(f"{final_output}")
+            print(f"{'─'*60}")
+            
+            # FULL ADVERSARY RECONSTRUCTION - UNTRUNCATED
+            adversary_output = detailed_result.get("adversary_output", "")
+            print(f"\n🔹 COMPLETE ADVERSARY RECONSTRUCTION:")
+            print(f"{'─'*60}")
+            print(f"{adversary_output}")
+            print(f"{'─'*60}")
+            
+            # COMPLETE AGENT MESSAGE LOG - ALL MESSAGES UNTRUNCATED
+            message_log = detailed_result.get("message_log", [])
+            print(f"\n🔹 COMPLETE AGENT MESSAGE LOG ({len(message_log)} messages):")
+            print(f"{'═'*80}")
+            for i, msg in enumerate(message_log):
+                print(f"\n📨 MESSAGE {i+1}:")
+                print(f"{'┌'+'─'*78+'┐'}")
+                # Split long messages into lines for better readability
+                lines = msg.split('\n')
+                for line in lines:
+                    if len(line) <= 76:
+                        print(f"│ {line:<76} │")
+                    else:
+                        # Break long lines
+                        words = line.split(' ')
+                        current_line = ""
+                        for word in words:
+                            if len(current_line + word) <= 76:
+                                current_line += word + " "
+                            else:
+                                if current_line:
+                                    print(f"│ {current_line.rstrip():<76} │")
+                                current_line = word + " "
+                        if current_line:
+                            print(f"│ {current_line.rstrip():<76} │")
+                print(f"{'└'+'─'*78+'┘'}")
+            print(f"{'═'*80}")
+            
+            # DETAILED GROUND TRUTH COMPARISON
+            print(f"\n🔹 GROUND TRUTH ANALYSIS:")
+            print(f"  Expected Condition: {detailed_result.get('condition', 'N/A')}")
+            print(f"  Expected Treatment: {detailed_result.get('treatment_id', 'N/A')}")
+            print(f"  Expected Patient ID: {detailed_result.get('patient_id', 'N/A')}")
+            
+            # Enhanced metrics logging
+            if "rsl_steps" in detailed_result:
+                rsl = detailed_result["rsl_steps"]
+                print(f"  RSL (Steps to Leakage): {rsl if rsl != float('inf') else '∞'}")
+            if "semantic_fidelity" in detailed_result:
+                print(f"  Semantic Fidelity: {detailed_result['semantic_fidelity']:.3f}")
+            if "privacy_utility_score" in detailed_result:
+                print(f"  Privacy-Utility Score: {detailed_result['privacy_utility_score']:.3f}")
+            
+            print(f"\n{'='*80}")
             
             # Check for API error markers in the results
             if (detailed_result.get("adversary_output") == "API_ERROR_FAILURE" or
                 detailed_result.get("final_output") == "API_ERROR_FAILURE"):
+                print(f"⚠️  TRIAL {trial + 1} SKIPPED: API Error detected")
                 st.warning(f"Trial {trial + 1} skipped due to API error")
                 skipped_trials += 1
                 continue  # Skip this trial to prevent corrupted results
@@ -179,13 +266,45 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
             detailed_result["task_success"] = task_success
             results.append(detailed_result)
             
+            # 📝 LOG TO MARKDOWN FILE
+            logger.log_comparative_experiment(
+                mode=mode,
+                trial_num=trial + 1,
+                n_trials=n_trials,
+                detailed_result=detailed_result,
+                lambda_val=lambda_val
+            )
+            
         except Exception as e:
+            print(f"❌ TRIAL {trial + 1} FAILED: {e}")
             st.warning(f"Trial {trial + 1} failed with error: {e}")
             skipped_trials += 1
             continue  # Skip failed trials
     
     # Calculate final metrics
-    final_metrics = metrics.calculate_metrics(results)
+    final_metrics = metrics.calculate_metrics(results, lambda_val)
+    
+    # ENHANCED EXPERIMENT SUMMARY LOGGING
+    print(f"\n🎯 EXPERIMENT COMPLETED - MODE: {mode}")
+    print(f"📈 FINAL METRICS SUMMARY:")
+    print(f"  Total Valid Trials: {len(results)}")
+    print(f"  Skipped Trials: {skipped_trials}")
+    print(f"  Exfiltration Rate (ER): {final_metrics['ER']:.2%} ({final_metrics.get('successful_exfiltrations', 0)} successes)")
+    print(f"  Task Success Rate (TSR): {final_metrics['TSR']:.2%} ({final_metrics.get('successful_tasks', 0)} successes)")
+    print(f"  Privacy-Utility Score: {final_metrics.get('privacy_utility_score', 0.0):.3f}")
+    print(f"  Avg RSL: {final_metrics.get('avg_RSL', float('inf'))}")
+    print(f"  Semantic Fidelity: {final_metrics.get('semantic_fidelity', 0.0):.3f}")
+    print(f"  Lambda (λ) used: {lambda_val}")
+    print(f"🏁 MODE {mode} EXPERIMENT COMPLETE\n")
+    
+    # 📝 LOG EXPERIMENT SUMMARY TO MARKDOWN FILE
+    logger.log_experiment_summary(
+        mode=mode,
+        final_metrics=final_metrics,
+        total_trials=len(results),
+        skipped_trials=skipped_trials,
+        lambda_val=lambda_val
+    )
     
     # Display summary of results
     if skipped_trials > 0:
@@ -204,7 +323,7 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
     }
 
 
-def display_results_comparison(baseline_results: Dict, prism_results: Dict):
+def display_results_comparison(baseline_results: Dict, prism_results: Dict, lambda_val: float = 1.0):
     """Display comprehensive comparative results between baseline and PRISM with enhanced metrics."""
     
     st.subheader("📊 Comprehensive Experimental Results")
@@ -242,12 +361,13 @@ def display_results_comparison(baseline_results: Dict, prism_results: Dict):
     
     # Metrics definitions expander
     with st.expander("📚 Metrics Definitions"):
-        st.markdown("""
+        st.markdown(f"""
         **ER (Exfiltration Rate):** Percentage of trials where adversary successfully reconstructed sensitive information
         - Formula: `(Successful Exfiltrations / Total Trials) × 100%`
         
         **TSR (Task Success Rate):** Percentage of trials where the system successfully completed the medical task
         - Formula: `(Successful Tasks / Total Trials) × 100%`
+        - Enhanced with Pydantic structured output for reliable treatment ID detection
         
         **RSL (Reflective Steps to Leakage):** Number of agent steps until sensitive information leakage threshold exceeded
         - Lower values indicate faster information leakage
@@ -256,7 +376,8 @@ def display_results_comparison(baseline_results: Dict, prism_results: Dict):
         - Range: 0-1, higher values indicate better task completion quality
         
         **Privacy-Utility Score:** Composite metric balancing privacy preservation and utility
-        - Formula: `(1 - leakage_penalty) + utility_score`
+        - Formula: `(TSR × 100) - (ER × λ)` where λ = {lambda_val:.1f} (dynamic leakage penalty)
+        - Higher values indicate better privacy-utility trade-off
         """)
     
     # Calculate improvement metrics
@@ -418,7 +539,7 @@ def main():
     display_header()
     
     # Create sidebar
-    n_trials = create_sidebar()
+    n_trials, lambda_val = create_sidebar()
     
     # Setup LLM
     llm = setup_llm()
@@ -439,7 +560,7 @@ def main():
             st.session_state.experiment_running = True
             
             with st.spinner(f"Running {n_trials} baseline trials..."):
-                baseline_results = run_experiment_mode("BASELINE", n_trials, llm, graph)
+                baseline_results = run_experiment_mode("BASELINE", n_trials, llm, graph, lambda_val)
                 st.session_state.results["baseline"] = baseline_results
             
             st.success(f"✅ Baseline experiment completed! ER: {baseline_results['metrics']['ER']:.2%}")
@@ -450,7 +571,7 @@ def main():
             st.session_state.experiment_running = True
             
             with st.spinner(f"Running {n_trials} PRISM trials..."):
-                prism_results = run_experiment_mode("PRISM", n_trials, llm, graph)
+                prism_results = run_experiment_mode("PRISM", n_trials, llm, graph, lambda_val)
                 st.session_state.results["prism"] = prism_results
             
             st.success(f"✅ PRISM experiment completed! ER: {prism_results['metrics']['ER']:.2%}")
@@ -463,12 +584,12 @@ def main():
         
         # Run baseline
         st.info("🚨 Running Baseline experiments...")
-        baseline_results = run_experiment_mode("BASELINE", n_trials, llm, graph)
+        baseline_results = run_experiment_mode("BASELINE", n_trials, llm, graph, lambda_val)
         st.session_state.results["baseline"] = baseline_results
         
         # Run PRISM
         st.info("🛡️ Running PRISM experiments...")
-        prism_results = run_experiment_mode("PRISM", n_trials, llm, graph)
+        prism_results = run_experiment_mode("PRISM", n_trials, llm, graph, lambda_val)
         st.session_state.results["prism"] = prism_results
         
         st.success("✅ Complete comparative study finished!")
@@ -503,6 +624,9 @@ def main():
                     llm, graph
                 )
                 
+                # Store adversarial results for session summary
+                st.session_state.adversarial_results.append(adversarial_results)
+                
                 # Display adversarial results
                 display_adversarial_results(adversarial_results)
             else:
@@ -513,7 +637,8 @@ def main():
         st.markdown("---")
         display_results_comparison(
             st.session_state.results["baseline"],
-            st.session_state.results["prism"]
+            st.session_state.results["prism"],
+            lambda_val
         )
         
         create_visualizations(
@@ -542,6 +667,45 @@ def main():
         
         **Conclusion:** The PRISM framework successfully addresses the privacy-utility trade-off in multi-agent LLM systems.
         """)
+        
+        # 📝 GENERATE SESSION SUMMARY
+        if st.button("📝 Generate Complete Session Summary"):
+            logger = get_experiment_logger()
+            
+            # Collect adversarial test results if available
+            adversarial_tests = []
+            if "adversarial_results" in st.session_state:
+                for result in st.session_state.adversarial_results:
+                    adversarial_tests.append({
+                        "description": result.get("adversarial_prompt", "Adversarial Test")[:50] + "...",
+                        "baseline_breach": result["baseline"]["exfiltration_success"],
+                        "prism_breach": result["prism"]["exfiltration_success"]
+                    })
+            
+            logger.create_session_summary(
+                baseline_metrics=st.session_state.results["baseline"]['metrics'],
+                prism_metrics=st.session_state.results["prism"]['metrics'],
+                adversarial_tests=adversarial_tests,
+                lambda_val=lambda_val
+            )
+            
+            st.success("📝 Complete session summary generated! Check the 'experiment_logs/session_summaries/' folder for the comprehensive markdown documentation.")
+            st.info("🎓 **Academic Use:** These logs provide complete transparency and documentation for thesis validation, peer review, and reproducible research.")
+    
+    # Log Generation Section
+    st.markdown("---")
+    st.subheader("📝 Experiment Documentation")
+    st.markdown("""
+    **Comprehensive Logging System**
+    
+    All experiments are automatically logged to organized markdown files for academic documentation:
+    
+    - **Comparative Experiments**: `/experiment_logs/comparative_experiments/`
+    - **Adversarial Testing**: `/experiment_logs/adversarial_testing/`  
+    - **Session Summaries**: `/experiment_logs/session_summaries/`
+    
+    These logs provide complete transparency, reproducibility, and academic-grade documentation for thesis validation.
+    """)
     
     # Footer
     st.markdown("---")
@@ -554,7 +718,7 @@ def main():
 
 def run_adversarial_test(adversarial_prompt: str, target_sensitive: str, llm, graph) -> Dict:
     """
-    Run adversarial test against both BASELINE and PRISM modes.
+    Run adversarial test against both BASELINE and PRISM modes with comprehensive logging.
     
     Args:
         adversarial_prompt: The adversarial prompt to test
@@ -566,6 +730,9 @@ def run_adversarial_test(adversarial_prompt: str, target_sensitive: str, llm, gr
         Dict containing adversarial test results
     """
     import random
+    
+    # Initialize experiment logger
+    logger = get_experiment_logger()
     
     # Create test case with target sensitive information
     condition = target_sensitive if target_sensitive in config.SENSITIVE_CONDITIONS else random.choice(config.SENSITIVE_CONDITIONS)
@@ -582,15 +749,150 @@ def run_adversarial_test(adversarial_prompt: str, target_sensitive: str, llm, gr
     
     results = {}
     
+    print(f"\n{'='*80}")
+    print(f"🎯 ADVERSARIAL TESTING SESSION INITIATED")
+    print(f"{'='*80}")
+    print(f"Target Condition: {condition}")
+    print(f"Target Treatment: {treatment_id}")
+    print(f"Target Patient ID: {patient_id}")
+    print(f"Adversarial Prompt: {adversarial_prompt}")
+    print(f"Full Secret Length: {len(full_secret)} characters")
+    print(f"{'='*80}")
+    
     # Test BASELINE mode
+    print(f"\n🚨 ADVERSARIAL TEST - BASELINE MODE")
+    print(f"{'─'*60}")
+    print(f"Expected Behavior: HIGH VULNERABILITY - Should leak sensitive data")
+    print(f"Testing Full Secret: {full_secret[:150]}...")
+    
     baseline_exfiltration, baseline_task, baseline_details = metrics.run_single_experiment(
-        full_secret, "BASELINE", graph, llm, config.get_ideal_output_template(treatment_id)
+        full_secret, "BASELINE", graph, llm, trial_num=1, verbose=True
     )
     
+    # COMPREHENSIVE BASELINE ADVERSARIAL LOGGING
+    print(f"\n📊 BASELINE ADVERSARIAL RESULTS:")
+    print(f"  Exfiltration Success: {'✅ BREACH DETECTED' if baseline_exfiltration else '❌ NO BREACH'}")
+    print(f"  Task Success: {'✅ COMPLETED' if baseline_task else '❌ FAILED'}")
+    
+    # FULL BASELINE FINAL OUTPUT - UNTRUNCATED
+    baseline_final = baseline_details.get("final_output", "")
+    print(f"\n🔹 BASELINE COMPLETE FINAL OUTPUT:")
+    print(f"{'─'*80}")
+    print(f"{baseline_final}")
+    print(f"{'─'*80}")
+    
+    # FULL BASELINE ADVERSARY RECONSTRUCTION - UNTRUNCATED
+    baseline_adversary = baseline_details.get("adversary_output", "")
+    print(f"\n🔹 BASELINE COMPLETE ADVERSARY RECONSTRUCTION:")
+    print(f"{'─'*80}")
+    print(f"{baseline_adversary}")
+    print(f"{'─'*80}")
+    
+    # COMPLETE BASELINE AGENT MESSAGE LOG - ALL MESSAGES UNTRUNCATED
+    baseline_messages = baseline_details.get("message_log", [])
+    print(f"\n🔹 BASELINE COMPLETE AGENT MESSAGE LOG ({len(baseline_messages)} messages):")
+    print(f"{'═'*80}")
+    for i, msg in enumerate(baseline_messages):
+        print(f"\n📨 BASELINE MESSAGE {i+1}:")
+        print(f"{'┌'+'─'*78+'┐'}")
+        # Split long messages into lines for better readability
+        lines = msg.split('\n')
+        for line in lines:
+            if len(line) <= 76:
+                print(f"│ {line:<76} │")
+            else:
+                # Break long lines
+                words = line.split(' ')
+                current_line = ""
+                for word in words:
+                    if len(current_line + word) <= 76:
+                        current_line += word + " "
+                    else:
+                        if current_line:
+                            print(f"│ {current_line.rstrip():<76} │")
+                        current_line = word + " "
+                if current_line:
+                    print(f"│ {current_line.rstrip():<76} │")
+        print(f"{'└'+'─'*78+'┘'}")
+    print(f"{'═'*80}")
+    
     # Test PRISM mode  
+    print(f"\n🛡️ ADVERSARIAL TEST - PRISM MODE")
+    print(f"{'─'*60}")
+    print(f"Expected Behavior: HIGH PROTECTION - Should block sensitive data")
+    print(f"Testing Full Secret: {full_secret[:150]}...")
+    
     prism_exfiltration, prism_task, prism_details = metrics.run_single_experiment(
-        full_secret, "PRISM", graph, llm, config.get_ideal_output_template(treatment_id)
+        full_secret, "PRISM", graph, llm, trial_num=1, verbose=True
     )
+    
+    # COMPREHENSIVE PRISM ADVERSARIAL LOGGING
+    print(f"\n📊 PRISM ADVERSARIAL RESULTS:")
+    print(f"  Exfiltration Success: {'🚨 BREACH DETECTED' if prism_exfiltration else '✅ PROTECTED'}")
+    print(f"  Task Success: {'✅ COMPLETED' if prism_task else '❌ FAILED'}")
+    
+    # FULL PRISM FINAL OUTPUT - UNTRUNCATED
+    prism_final = prism_details.get("final_output", "")
+    print(f"\n🔹 PRISM COMPLETE FINAL OUTPUT:")
+    print(f"{'─'*80}")
+    print(f"{prism_final}")
+    print(f"{'─'*80}")
+    
+    # FULL PRISM ADVERSARY RECONSTRUCTION - UNTRUNCATED
+    prism_adversary = prism_details.get("adversary_output", "")
+    print(f"\n🔹 PRISM COMPLETE ADVERSARY RECONSTRUCTION:")
+    print(f"{'─'*80}")
+    print(f"{prism_adversary}")
+    print(f"{'─'*80}")
+    
+    # COMPLETE PRISM AGENT MESSAGE LOG - ALL MESSAGES UNTRUNCATED
+    prism_messages = prism_details.get("message_log", [])
+    print(f"\n🔹 PRISM COMPLETE AGENT MESSAGE LOG ({len(prism_messages)} messages):")
+    print(f"{'═'*80}")
+    for i, msg in enumerate(prism_messages):
+        print(f"\n📨 PRISM MESSAGE {i+1}:")
+        print(f"{'┌'+'─'*78+'┐'}")
+        # Split long messages into lines for better readability
+        lines = msg.split('\n')
+        for line in lines:
+            if len(line) <= 76:
+                print(f"│ {line:<76} │")
+            else:
+                # Break long lines
+                words = line.split(' ')
+                current_line = ""
+                for word in words:
+                    if len(current_line + word) <= 76:
+                        current_line += word + " "
+                    else:
+                        if current_line:
+                            print(f"│ {current_line.rstrip():<76} │")
+                        current_line = word + " "
+                if current_line:
+                    print(f"│ {current_line.rstrip():<76} │")
+        print(f"{'└'+'─'*78+'┘'}")
+    print(f"{'═'*80}")
+    
+    # ADVERSARIAL TEST COMPARISON ANALYSIS
+    print(f"\n🎯 ADVERSARIAL TEST COMPARISON:")
+    print(f"{'='*80}")
+    print(f"BASELINE vs PRISM Adversarial Resistance:")
+    print(f"  BASELINE Exfiltration: {'BREACH' if baseline_exfiltration else 'SAFE'}")
+    print(f"  PRISM Exfiltration: {'BREACH' if prism_exfiltration else 'SAFE'}")
+    print(f"  Privacy Protection Improvement: {('YES' if baseline_exfiltration and not prism_exfiltration else 'NO')}")
+    print(f"  Utility Preservation: BASELINE({baseline_task}) → PRISM({prism_task})")
+    
+    # Enhanced metrics logging for adversarial tests
+    if "rsl_steps" in baseline_details:
+        baseline_rsl = baseline_details["rsl_steps"]
+        prism_rsl = prism_details.get("rsl_steps", float('inf'))
+        print(f"  RSL Improvement: BASELINE({baseline_rsl if baseline_rsl != float('inf') else '∞'}) → PRISM({prism_rsl if prism_rsl != float('inf') else '∞'})")
+    
+    if "semantic_fidelity" in baseline_details:
+        print(f"  Semantic Fidelity: BASELINE({baseline_details['semantic_fidelity']:.3f}) → PRISM({prism_details.get('semantic_fidelity', 0.0):.3f})")
+    
+    print(f"🏁 ADVERSARIAL TESTING SESSION COMPLETE")
+    print(f"{'='*80}\n")
     
     results = {
         "adversarial_prompt": adversarial_prompt,
@@ -607,31 +909,35 @@ def run_adversarial_test(adversarial_prompt: str, target_sensitive: str, llm, gr
         }
     }
     
+    # 📝 LOG ADVERSARIAL TEST TO MARKDOWN FILE
+    logger.log_adversarial_test(
+        adversarial_prompt=adversarial_prompt,
+        target_sensitive=target_sensitive,
+        baseline_results=results["baseline"],
+        prism_results=results["prism"]
+    )
+    
     return results
 
 
 def display_adversarial_results(results: Dict):
-    """Display adversarial test results in a formatted table."""
+    """Display comprehensive adversarial test results with detailed analysis."""
     st.subheader("🎯 Adversarial Test Results")
     
     # Create comparison table
     adversarial_data = {
         "Scenario": ["Baseline", "PRISM"],
         "Exfiltration Success": [
-            "✅ Yes" if results["baseline"]["exfiltration_success"] else "❌ No",
-            "✅ Yes" if results["prism"]["exfiltration_success"] else "❌ No"
+            "🚨 BREACH" if results["baseline"]["exfiltration_success"] else "✅ SAFE",
+            "🚨 BREACH" if results["prism"]["exfiltration_success"] else "✅ SAFE"
         ],
         "Task Success": [
             "✅ Yes" if results["baseline"]["task_success"] else "❌ No",
             "✅ Yes" if results["prism"]["task_success"] else "❌ No"
         ],
-        "KL Divergence": [
-            f"{results['baseline']['details'].get('kl_divergence', 0.0):.3f}",
-            f"{results['prism']['details'].get('kl_divergence', 0.0):.3f}"
-        ],
-        "RSL (steps)": [
-            f"{results['baseline']['details'].get('rsl_steps', 0):.1f}" if results['baseline']['details'].get('rsl_steps', float('inf')) != float('inf') else "∞",
-            f"{results['prism']['details'].get('rsl_steps', 0):.1f}" if results['prism']['details'].get('rsl_steps', float('inf')) != float('inf') else "∞"
+        "RSL Steps": [
+            f"{results['baseline']['details'].get('rsl_steps', float('inf')):.1f}" if results['baseline']['details'].get('rsl_steps', float('inf')) != float('inf') else "∞",
+            f"{results['prism']['details'].get('rsl_steps', float('inf')):.1f}" if results['prism']['details'].get('rsl_steps', float('inf')) != float('inf') else "∞"
         ],
         "Semantic Fidelity": [
             f"{results['baseline']['details'].get('semantic_fidelity', 0.0):.3f}",
@@ -642,24 +948,130 @@ def display_adversarial_results(results: Dict):
     adversarial_df = pd.DataFrame(adversarial_data)
     st.table(adversarial_df)
     
-    # Show detailed outputs
+    # Privacy Protection Analysis
+    baseline_breach = results["baseline"]["exfiltration_success"]
+    prism_breach = results["prism"]["exfiltration_success"]
+    
+    if baseline_breach and not prism_breach:
+        st.success("🛡️ **PRISM SUCCESS**: Adversarial attack blocked! PRISM successfully protected sensitive data while Baseline was compromised.")
+    elif baseline_breach and prism_breach:
+        st.error("🚨 **PRIVACY CONCERN**: Both systems were compromised by the adversarial attack. Consider strengthening PRISM defenses.")
+    elif not baseline_breach and not prism_breach:
+        st.info("🔒 **BOTH SECURE**: Neither system was compromised by this adversarial attack.")
+    else:
+        st.warning("⚠️ **UNEXPECTED**: PRISM was compromised but Baseline wasn't. This requires investigation.")
+    
+    # Show detailed outputs with comprehensive message logs
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### 🚨 Baseline Response")
-        with st.expander("View Baseline Details"):
+        with st.expander("View Complete Baseline Analysis", expanded=False):
             st.write("**Adversary Reconstruction:**")
-            st.text(results["baseline"]["details"].get("adversary_output", "N/A"))
-            st.write("**Final Output:**")
-            st.text(results["baseline"]["details"].get("final_output", "N/A")[:300] + "...")
+            st.code(results["baseline"]["details"].get("adversary_output", "N/A"), language="text")
+            
+            st.write("**Final System Output:**")
+            st.text_area(
+                "Baseline Final Output",
+                value=results["baseline"]["details"].get("final_output", "N/A"),
+                height=200,
+                key="baseline_final"
+            )
+            
+            st.write("**Complete Message Log:**")
+            baseline_messages = results["baseline"]["details"].get("message_log", [])
+            for i, msg in enumerate(baseline_messages):
+                with st.expander(f"Message {i+1} (Baseline)"):
+                    st.text(msg)
+            
+            # Enhanced metrics display
+            baseline_details = results["baseline"]["details"]
+            if "rsl_steps" in baseline_details:
+                st.metric("RSL Steps", f"{baseline_details['rsl_steps']:.1f}" if baseline_details['rsl_steps'] != float('inf') else "∞")
+            if "semantic_fidelity" in baseline_details:
+                st.metric("Semantic Fidelity", f"{baseline_details['semantic_fidelity']:.3f}")
     
     with col2:
         st.markdown("### 🛡️ PRISM Response")
-        with st.expander("View PRISM Details"):
+        with st.expander("View Complete PRISM Analysis", expanded=False):
             st.write("**Adversary Reconstruction:**")
-            st.text(results["prism"]["details"].get("adversary_output", "N/A"))
-            st.write("**Final Output:**")
-            st.text(results["prism"]["details"].get("final_output", "N/A")[:300] + "...")
+            st.code(results["prism"]["details"].get("adversary_output", "N/A"), language="text")
+            
+            st.write("**Final System Output:**")
+            st.text_area(
+                "PRISM Final Output",
+                value=results["prism"]["details"].get("final_output", "N/A"),
+                height=200,
+                key="prism_final"
+            )
+            
+            st.write("**Complete Message Log:**")
+            prism_messages = results["prism"]["details"].get("message_log", [])
+            for i, msg in enumerate(prism_messages):
+                with st.expander(f"Message {i+1} (PRISM)"):
+                    st.text(msg)
+            
+            # Enhanced metrics display
+            prism_details = results["prism"]["details"]
+            if "rsl_steps" in prism_details:
+                st.metric("RSL Steps", f"{prism_details['rsl_steps']:.1f}" if prism_details['rsl_steps'] != float('inf') else "∞")
+            if "semantic_fidelity" in prism_details:
+                st.metric("Semantic Fidelity", f"{prism_details['semantic_fidelity']:.3f}")
+    
+    # Adversarial Attack Analysis Summary
+    st.markdown("### 🔍 Adversarial Attack Analysis")
+    
+    attack_summary = f"""
+    **Adversarial Prompt Used:** {results['adversarial_prompt']}
+    
+    **Target Sensitive Information:** {results['target_sensitive']}
+    
+    **Attack Results:**
+    - Baseline Vulnerability: {'High Risk 🚨' if baseline_breach else 'Secure ✅'}
+    - PRISM Protection: {'Failed 🚨' if prism_breach else 'Successful ✅'}
+    - Privacy Improvement: {'Yes 🛡️' if baseline_breach and not prism_breach else 'No ⚠️'}
+    
+    **System Behavior:**
+    - Baseline Task Completion: {'Success ✅' if results['baseline']['task_success'] else 'Failed ❌'}
+    - PRISM Task Completion: {'Success ✅' if results['prism']['task_success'] else 'Failed ❌'}
+    - Utility Preservation: {'Maintained' if results['prism']['task_success'] else 'Compromised'}
+    """
+    
+    st.markdown(attack_summary)
+    
+    # Recommendations based on results
+    if baseline_breach and not prism_breach:
+        st.success("""
+        **🎯 Adversarial Test Validation:**
+        - PRISM successfully defended against the adversarial attack
+        - Sensitive information was protected through semantic minimization
+        - Task utility was preserved despite the adversarial prompt
+        - This demonstrates PRISM's robustness against targeted attacks
+        """)
+    elif baseline_breach and prism_breach:
+        st.error("""
+        **⚠️ Security Recommendations:**
+        - Both systems were compromised - consider strengthening defenses
+        - Review semantic minimization parameters
+        - Analyze message filtering effectiveness
+        - Consider additional adversarial training
+        """)
+    
+    # Show the test configuration
+    with st.expander("🔧 Test Configuration Details"):
+        st.write(f"**Full Adversarial Prompt:** {results['adversarial_prompt']}")
+        st.write(f"**Target Sensitive Data:** {results['target_sensitive']}")
+        st.write(f"**Baseline Messages:** {len(results['baseline']['details'].get('message_log', []))}")
+        st.write(f"**PRISM Messages:** {len(results['prism']['details'].get('message_log', []))}")
+        
+        # Show ground truth comparison
+        st.write("**Ground Truth Validation:**")
+        for mode, mode_results in [("Baseline", results["baseline"]), ("PRISM", results["prism"])]:
+            details = mode_results["details"]
+            st.write(f"- {mode} Expected vs Actual:")
+            st.write(f"  - Condition: {details.get('condition', 'N/A')}")
+            st.write(f"  - Treatment: {details.get('treatment_id', 'N/A')}")
+            st.write(f"  - Patient ID: {details.get('patient_id', 'N/A')}")
 
 
 if __name__ == "__main__":

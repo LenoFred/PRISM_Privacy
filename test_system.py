@@ -7,6 +7,7 @@ import config
 import prism_logic
 import llm_client
 import metrics
+import agents
 from agents import build_graph, create_initial_state
 
 def test_api_connection():
@@ -182,13 +183,16 @@ def test_task_success_evaluation():
     print("\nTesting Task Success Evaluation...")
     
     try:
+        # Get LLM instance for testing
+        llm = agents.get_llm()
+        
         # Test successful output
         successful_output = "Based on your Chronic Ailment Category, I recommend continuing with RX_Alpha_7. The estimated cost is $150."
-        success_result = metrics.evaluate_task_success(successful_output, "RX_Alpha_7")
+        success_result = metrics.evaluate_task_success(successful_output, "RX_Alpha_7", llm)
         
         # Test unsuccessful output (missing treatment)
         unsuccessful_output = "I cannot provide specific treatment recommendations."
-        failure_result = metrics.evaluate_task_success(unsuccessful_output, "RX_Alpha_7")
+        failure_result = metrics.evaluate_task_success(unsuccessful_output, "RX_Alpha_7", llm)
         
         print(f"Successful output evaluation: {success_result}")
         print(f"Unsuccessful output evaluation: {failure_result}")

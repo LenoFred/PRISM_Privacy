@@ -29,11 +29,23 @@ import prism_logic
 
 # Pydantic Schema for Structured Output
 class TreatmentOutput(BaseModel):
-    """Structured output schema for treatment and recomposition agents."""
-    treatment_id: str = Field(description="The recommended treatment ID (e.g., RX_Alpha_7)")
-    patient_id: str = Field(description="The patient identifier") 
-    medical_assessment: str = Field(description="Medical assessment or recommendation text")
-    pricing_estimate: Optional[str] = Field(description="Cost estimate if applicable", default=None)
+    """Structured output schema for treatment and recomposition agents to ensure reliable TSR detection."""
+    treatment_id: str = Field(
+        description="The exact recommended treatment ID (e.g., RX_Alpha_7). Must be preserved exactly for utility.",
+        min_length=3
+    )
+    patient_id: str = Field(
+        description="The patient identifier - may be anonymized in PRISM mode",
+        min_length=1
+    )
+    medical_assessment: str = Field(
+        description="Medical assessment, diagnosis summary, or recommendation text",
+        min_length=10
+    )
+    pricing_estimate: Optional[str] = Field(
+        description="Cost estimate or pricing information if applicable", 
+        default=None
+    )
 
 
 def get_llm():

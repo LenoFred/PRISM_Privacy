@@ -2,32 +2,62 @@
 .DS_Store
 Thumbs.db
 
-# LaTeX build artifacts
-*.aux
-*.log
-*.out
-*.toc
-*.synctex.gz
-*.fls
-*.fdb_latexmk
+# Environment files
+.env
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Jupyter
-.ipynb_checkpoints
+# Virtual environments
+prism_env/
+venv/
+env/
+ENV/
 
-# Word / Office temp
-~$*
-*.tmp
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Large files we don't want in git
+# Test files (except test_system.py which is essential)
+test_adversarial_*.py
+test_comprehensive_*.py
+test_enhanced_*.py
+test_experiment_*.py
+
+# Development artifacts
+ENHANCEMENT_SUMMARY.md
+Adversarial Examples.txt
+streamlit interface image.png
+llm_client.py
+
+# Large files
 *.zip
 *.tar.gz
 
-# Git LFS metadata (if used)
-*.pdf
+# IMPORTANT: Preserve experiment logs for thesis evidence
+!experiment_logs/
+!experiment_logs/**/*
 
 
 .env

@@ -11,14 +11,14 @@ load_dotenv()
 
 # LLM Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # Hugging Face Configuration
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_MODEL = os.getenv("HF_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct")
 
-# LLM Provider Selection
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "hf"
+# LLM Provider Selection - FIXED TO OPENAI WITH GPT-4O-MINI
+LLM_PROVIDER = "openai"  # ALWAYS USE OPENAI WITH GPT-4O-MINI
 
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 

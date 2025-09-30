@@ -36,23 +36,13 @@ def initialize_app():
 def setup_llm():
     """Setup LLM configuration and validate API key."""
     try:
-        import llm_client
+        # Use the agents module's get_llm function (consistent with updates)
+        llm = agents.get_llm()
         
-        # Check provider configuration
-        provider = config.LLM_PROVIDER.lower()
-        if provider == "openai":
-            if not config.OPENAI_API_KEY or config.OPENAI_API_KEY == "your_openai_api_key_here":
-                st.error("Please set your OPENAI_API_KEY in the .env file")
-                st.stop()
-        elif provider == "hf":
-            if not config.HF_TOKEN or config.HF_TOKEN == "your_hf_token_here":
-                st.error("Please set your HF_TOKEN in the .env file")
-                st.stop()
-        else:
-            st.error(f"Invalid LLM_PROVIDER: {provider}. Use 'openai' or 'hf'")
+        # Validate OpenAI API key
+        if not config.OPENAI_API_KEY or config.OPENAI_API_KEY == "your_openai_api_key_here":
+            st.error("Please set your OPENAI_API_KEY in the .env file")
             st.stop()
-        
-        llm = llm_client.get_llm()
         
         return llm
         
@@ -135,7 +125,7 @@ def display_header():
 
 def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
     """
-    Run experiment for a specific mode.
+    Run experiment for a specific mode with API error handling.
     
     Args:
         mode: "BASELINE" or "PRISM"
@@ -152,6 +142,7 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
     
     # Initialize results storage
     results = []
+    skipped_trials = 0
     
     for trial in range(n_trials):
         # Update progress
@@ -170,16 +161,37 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
             patient_id=patient_id
         )
         
-        # Run single experiment
-        exfiltration_success, task_success, detailed_result = metrics.run_single_experiment(
-            full_secret, mode, graph, llm
-        )
-        
-        detailed_result["trial"] = trial + 1
-        results.append(detailed_result)
+        # Run single experiment with API error handling
+        try:
+            exfiltration_success, task_success, detailed_result = metrics.run_single_experiment(
+                full_secret, mode, graph, llm
+            )
+            
+            # Check for API error markers in the results
+            if (detailed_result.get("adversary_output") == "API_ERROR_FAILURE" or
+                detailed_result.get("final_output") == "API_ERROR_FAILURE"):
+                st.warning(f"Trial {trial + 1} skipped due to API error")
+                skipped_trials += 1
+                continue  # Skip this trial to prevent corrupted results
+            
+            detailed_result["trial"] = trial + 1
+            detailed_result["exfiltration_success"] = exfiltration_success
+            detailed_result["task_success"] = task_success
+            results.append(detailed_result)
+            
+        except Exception as e:
+            st.warning(f"Trial {trial + 1} failed with error: {e}")
+            skipped_trials += 1
+            continue  # Skip failed trials
     
     # Calculate final metrics
     final_metrics = metrics.calculate_metrics(results)
+    
+    # Display summary of results
+    if skipped_trials > 0:
+        st.info(f"{mode} mode: {len(results)} valid trials completed, {skipped_trials} trials skipped due to API errors")
+    else:
+        st.success(f"{mode} mode: {len(results)} trials completed successfully")
     
     # Clear progress indicators
     progress_bar.empty()
@@ -187,7 +199,8 @@ def run_experiment_mode(mode: str, n_trials: int, llm, graph) -> Dict:
     
     return {
         "metrics": final_metrics,
-        "detailed_results": results
+        "detailed_results": results,
+        "skipped_trials": skipped_trials
     }
 
 
@@ -209,10 +222,6 @@ def display_results_comparison(baseline_results: Dict, prism_results: Dict):
         "TSR (%)": [
             f"{baseline_metrics['TSR']:.1%}",
             f"{prism_metrics['TSR']:.1%}"
-        ],
-        "KL Divergence": [
-            f"{baseline_metrics.get('KL_divergence', 0.0):.3f}",
-            f"{prism_metrics.get('KL_divergence', 0.0):.3f}"
         ],
         "RSL (steps)": [
             f"{baseline_metrics.get('avg_RSL', 0):.1f}" if baseline_metrics.get('avg_RSL', float('inf')) != float('inf') else "∞",
@@ -239,9 +248,6 @@ def display_results_comparison(baseline_results: Dict, prism_results: Dict):
         
         **TSR (Task Success Rate):** Percentage of trials where the system successfully completed the medical task
         - Formula: `(Successful Tasks / Total Trials) × 100%`
-        
-        **KL Divergence:** Information-theoretic measure of attacker information gain
-        - Measures divergence between observed log distribution vs. uniform baseline
         
         **RSL (Reflective Steps to Leakage):** Number of agent steps until sensitive information leakage threshold exceeded
         - Lower values indicate faster information leakage

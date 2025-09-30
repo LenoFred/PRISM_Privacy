@@ -4,11 +4,15 @@ Implements the three-agent workflow with state scrubbing capabilities.
 """
 
 import sys
-from typing import TypedDict, List
+import os
+from typing import TypedDict, List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 import operator
 import config
+from pydantic import BaseModel, Field
+from openai import APIError
 
 # Python 3.8 compatibility for Annotated and Literal
 if sys.version_info >= (3, 9):
@@ -21,7 +25,29 @@ if sys.version_info >= (3, 8):
 else:
     from typing_extensions import Literal
 import prism_logic
-import llm_client
+
+
+# Pydantic Schema for Structured Output
+class TreatmentOutput(BaseModel):
+    """Structured output schema for treatment and recomposition agents."""
+    treatment_id: str = Field(description="The recommended treatment ID (e.g., RX_Alpha_7)")
+    patient_id: str = Field(description="The patient identifier") 
+    medical_assessment: str = Field(description="Medical assessment or recommendation text")
+    pricing_estimate: Optional[str] = Field(description="Cost estimate if applicable", default=None)
+
+
+def get_llm():
+    """
+    Create OpenAI LLM client using gpt-4o-mini model.
+    """
+    if not config.OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY not set. Please set it in .env file.")
+    
+    return ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=config.TEMPERATURE,
+        api_key=config.OPENAI_API_KEY
+    )
 
 
 class AgentState(TypedDict):
@@ -63,8 +89,8 @@ def input_encoder_sm(state: AgentState) -> AgentState:
     This is the core thesis contribution.
     """
     try:
-        # Initialize LLM using unified client
-        llm = llm_client.get_llm()
+        # Initialize LLM using gpt-4o-mini
+        llm = get_llm()
         
         user_input = state["full_secret_s"]
         mode = state["mode"]
@@ -72,75 +98,97 @@ def input_encoder_sm(state: AgentState) -> AgentState:
         # Extract sensitive components
         condition, treatment_id, patient_id = prism_logic.extract_sensitive_components(user_input)
         
-        if mode == "BASELINE":
-            # BASELINE: Include raw sensitive data in message log (high leakage)
-            prompt = config.AGENT_A_PROMPT.format(mode=mode, user_input=user_input)
-            messages = [HumanMessage(content=prompt)]
-            response = llm.invoke(messages)
-            
-            # Add FULL sensitive message to log (this will leak in baseline)
-            agent_message = AIMessage(content=f"Agent A Analysis: {response.content}\nOriginal Input: {user_input}")
-            
-            return {
-                **state,
-                "messages": [agent_message],
-                "sanitized_uom": user_input,  
-                "condition": condition or "",
-                "treatment_id": treatment_id or "",
-                "patient_id": patient_id or ""
-            }
-            
-        elif mode == "PRISM":
-            # PRISM: Apply Semantic Minimization and State Scrubbing
-            
-            # Step 1: Perform Semantic Minimization
-            sanitized_input = prism_logic.semantic_minimization_sm(user_input, llm)
-            
-            # Step 2: Process with Agent A using sanitized input
-            prompt = config.AGENT_A_PROMPT.format(mode=mode, user_input=sanitized_input)
-            messages = [HumanMessage(content=prompt)]
-            response = llm.invoke(messages)
-            
-            # Step 3: CRITICAL - State Scrubbing
-            # Only add NON-SENSITIVE message to the log
-            agent_message = AIMessage(content=f"Agent A Analysis: {response.content}\nProcessed Input: {sanitized_input}")
-            
-            # Validate minimization was successful
-            is_valid = prism_logic.validate_semantic_minimization(user_input, sanitized_input)
-            if not is_valid:
-                print(f"Warning: Semantic minimization may have failed for input: {user_input[:50]}...")
-            
-            return {
-                **state,
-                "messages": [agent_message],
-                "sanitized_uom": sanitized_input,
-                "condition": condition or "",
-                "treatment_id": treatment_id or "",
-                "patient_id": patient_id or ""
-            }
-    
+        if mode == "PRISM":
+            # Apply Semantic Minimization
+            try:
+                sanitized_input = prism_logic.semantic_minimization_sm(user_input, llm)
+                
+                prompt = f"""You are a medical intake specialist. Analyze this sanitized input and provide an initial assessment:
+                
+                Input: {sanitized_input}
+                
+                Provide a brief medical intake assessment without revealing specific conditions or personal identifiers."""
+                
+                response = llm.invoke([HumanMessage(content=prompt)])
+                agent_response = response.content if hasattr(response, 'content') else str(response)
+                
+                # STATE SCRUBBING: Only add sanitized content to messages log
+                new_message = AIMessage(
+                    content=f"Agent A Assessment: {agent_response}\nInput processed: {sanitized_input}"
+                )
+                
+                return {
+                    **state,
+                    "messages": [new_message],
+                    "sanitized_uom": sanitized_input,
+                    "condition": condition,
+                    "treatment_id": treatment_id,
+                    "patient_id": patient_id
+                }
+                
+            except (APIError, Exception) as e:
+                print(f"API Error in Agent A: {e}")
+                return {
+                    **state,
+                    "task_success": False,
+                    "final_output": "API_ERROR_FAILURE",
+                    "messages": [AIMessage(content="Agent A: API Error occurred")]
+                }
+        
+        else:  # BASELINE mode
+            try:
+                prompt = f"""You are a medical intake specialist. Analyze this input and provide an initial assessment:
+                
+                Input: {user_input}
+                
+                Provide a brief medical intake assessment."""
+                
+                response = llm.invoke([HumanMessage(content=prompt)])
+                agent_response = response.content if hasattr(response, 'content') else str(response)
+                
+                # BASELINE: Full secret goes into messages log (high leakage)
+                new_message = AIMessage(
+                    content=f"Agent A Assessment: {agent_response}\nOriginal input: {user_input}"
+                )
+                
+                return {
+                    **state,
+                    "messages": [new_message],
+                    "sanitized_uom": user_input,  # No sanitization in baseline
+                    "condition": condition,
+                    "treatment_id": treatment_id,
+                    "patient_id": patient_id
+                }
+                
+            except (APIError, Exception) as e:
+                print(f"API Error in Agent A (Baseline): {e}")
+                return {
+                    **state,
+                    "task_success": False,
+                    "final_output": "API_ERROR_FAILURE",
+                    "messages": [AIMessage(content="Agent A: API Error occurred")]
+                }
+                
     except Exception as e:
-        print(f"Error in input_encoder_sm: {e}")
-        # Fallback behavior
+        print(f"Critical error in Agent A: {e}")
         return {
             **state,
-            "messages": [AIMessage(content=f"Agent A Error: {str(e)}")],
-            "sanitized_uom": state["full_secret_s"],
-            "condition": "",
-            "treatment_id": "",
-            "patient_id": ""
+            "task_success": False,
+            "final_output": "API_ERROR_FAILURE",
+            "messages": [AIMessage(content="Agent A: Critical error occurred")]
         }
 
 
 def treatment_agent(state: AgentState) -> AgentState:
     """
-    Agent B (Treatment Advisor)
+    Agent B (Treatment Advisor) - WITH STRUCTURED OUTPUT
     
     Processes the available context (restricted by RI) and generates treatment recommendations.
     """
     try:
-        # Initialize LLM using unified client
-        llm = llm_client.get_llm()
+        # Initialize LLM with structured output capability
+        llm = get_llm()
+        structured_llm = llm.with_structured_output(TreatmentOutput)
         
         # Apply Restricted Information (RI) filtering
         filtered_state = prism_logic.restricted_information_ri(state, "Agent_B")
@@ -148,42 +196,67 @@ def treatment_agent(state: AgentState) -> AgentState:
         # Get context from available messages
         context = "\n".join([msg.content for msg in filtered_state.get("messages", [])])
         treatment_id = state.get("treatment_id", "Unknown")
+        patient_id = state.get("patient_id", "Unknown")
         
-        # Generate treatment advice
-        prompt = config.AGENT_B_PROMPT.format(
-            context=context,
-            treatment_id=treatment_id
-        )
+        # Generate structured treatment advice
+        prompt = f"""Based on the medical assessment provided, generate a structured treatment recommendation.
+
+Context: {context}
+
+You must provide:
+1. A specific treatment_id (use the one mentioned in context: {treatment_id})
+2. The patient_id from the context: {patient_id}  
+3. A clear medical assessment
+4. Optional pricing estimate
+
+Be precise and use the exact treatment_id and patient_id provided."""
         
-        messages = [HumanMessage(content=prompt)]
-        response = llm.invoke(messages)
-        
-        # Add agent's response to message log
-        agent_message = AIMessage(content=f"Agent B Treatment Advice: {response.content}")
-        
-        return {
-            **state,
-            "messages": state["messages"] + [agent_message]
-        }
+        try:
+            response = structured_llm.invoke([HumanMessage(content=prompt)])
+            
+            # Validate response structure
+            if hasattr(response, 'treatment_id') and hasattr(response, 'patient_id'):
+                # Add agent's response to message log
+                agent_message = AIMessage(
+                    content=f"Agent B Treatment: {response.treatment_id} for {response.patient_id} - {response.medical_assessment}"
+                )
+                
+                return {
+                    **state,
+                    "messages": state["messages"] + [agent_message]
+                }
+            else:
+                raise ValueError("Invalid structured output format")
+                
+        except (APIError, Exception) as e:
+            print(f"API Error in Agent B: {e}")
+            return {
+                **state,
+                "task_success": False,
+                "final_output": "API_ERROR_FAILURE",
+                "messages": state["messages"] + [AIMessage(content="Agent B: API Error occurred")]
+            }
         
     except Exception as e:
-        print(f"Error in treatment_agent: {e}")
-        error_message = AIMessage(content=f"Agent B Error: {str(e)}")
+        print(f"Critical error in Agent B: {e}")
         return {
             **state,
-            "messages": state["messages"] + [error_message]
+            "task_success": False,
+            "final_output": "API_ERROR_FAILURE",
+            "messages": state["messages"] + [AIMessage(content="Agent B: Critical error occurred")]
         }
 
 
 def recomposition_agent(state: AgentState) -> AgentState:
     """
-    Agent C (Pricing & Final Output)
+    Agent C (Pricing & Final Output) - WITH STRUCTURED OUTPUT
     
     Provides final pricing and recommendations while maintaining privacy constraints.
     """
     try:
-        # Initialize LLM using unified client
-        llm = llm_client.get_llm()
+        # Initialize LLM with structured output capability
+        llm = get_llm()
+        structured_llm = llm.with_structured_output(TreatmentOutput)
         
         # Apply Restricted Information (RI) filtering
         filtered_state = prism_logic.restricted_information_ri(state, "Agent_C")
@@ -191,32 +264,58 @@ def recomposition_agent(state: AgentState) -> AgentState:
         # Get context from available messages
         context = "\n".join([msg.content for msg in filtered_state.get("messages", [])])
         treatment_id = state.get("treatment_id", "Unknown")
+        patient_id = state.get("patient_id", "Unknown")
         
-        # Generate final output with pricing
-        prompt = config.AGENT_C_PROMPT.format(
-            context=context,
-            treatment_id=treatment_id
-        )
+        # Generate final structured output
+        prompt = f"""Based on the complete medical workflow, provide final recommendations with pricing.
+
+Context: {context}
+
+You must provide:
+1. The exact treatment_id: {treatment_id}
+2. The exact patient_id: {patient_id}
+3. Final medical assessment and recommendations
+4. Pricing estimate for the treatment
+
+Be precise and maintain the exact treatment_id and patient_id."""
         
-        messages = [HumanMessage(content=prompt)]
-        response = llm.invoke(messages)
-        
-        # Add agent's response to message log
-        agent_message = AIMessage(content=f"Agent C Final Output: {response.content}")
-        
-        return {
-            **state,
-            "messages": state["messages"] + [agent_message],
-            "final_output": response.content
-        }
+        try:
+            response = structured_llm.invoke([HumanMessage(content=prompt)])
+            
+            # Validate response structure
+            if hasattr(response, 'treatment_id') and hasattr(response, 'patient_id'):
+                final_output = f"Treatment: {response.treatment_id} for Patient: {response.patient_id}. {response.medical_assessment}"
+                if response.pricing_estimate:
+                    final_output += f" Estimated cost: {response.pricing_estimate}"
+                
+                # Add final agent response to message log
+                agent_message = AIMessage(content=f"Agent C Final: {final_output}")
+                
+                return {
+                    **state,
+                    "messages": state["messages"] + [agent_message],
+                    "final_output": final_output,
+                    "task_success": True
+                }
+            else:
+                raise ValueError("Invalid structured output format")
+                
+        except (APIError, Exception) as e:
+            print(f"API Error in Agent C: {e}")
+            return {
+                **state,
+                "task_success": False,
+                "final_output": "API_ERROR_FAILURE",
+                "messages": state["messages"] + [AIMessage(content="Agent C: API Error occurred")]
+            }
         
     except Exception as e:
-        print(f"Error in recomposition_agent: {e}")
-        error_message = AIMessage(content=f"Agent C Error: {str(e)}")
+        print(f"Critical error in Agent C: {e}")
         return {
             **state,
-            "messages": state["messages"] + [error_message],
-            "final_output": f"Error in final processing: {str(e)}"
+            "task_success": False,
+            "final_output": "API_ERROR_FAILURE",
+            "messages": state["messages"] + [AIMessage(content="Agent C: Critical error occurred")]
         }
 
 

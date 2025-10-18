@@ -12,8 +12,8 @@
 The **PRISM Framework** addresses the critical **Puzzle Piece Privacy Problem (PZPP)** in multi-agent Large Language Model (LLM) systems. PZPP occurs when individually non-sensitive information pieces become collectively sensitive when combined across agent interactions, creating a cumulative privacy leakage problem.
 
 PRISM implements two core mechanisms:
-- **🔒 Restricted Information (RI)**: Access control filtering based on agent roles
-- **🧩 Semantic Minimization (SM)**: LLM-based transformation preserving utility while breaking privacy linkage
+- **Restricted Information (RI)**: Access control filtering based on agent roles
+- **Semantic Minimization (SM)**: LLM-based transformation preserving utility while breaking privacy linkage
 
 ## Key Research Contributions
 
@@ -155,10 +155,6 @@ Based on empirical validation across multiple experimental sessions with 30-tria
   - Perfect task completion rate maintained in both modes
   - Zero utility degradation during privacy protection
 
-#### **Enhanced Metrics Analysis:**
-- **RSL Improvement**: 7x increase in steps to leakage (1.0 → 7.0 steps)
-- **Semantic Fidelity Enhancement**: +15.4% average improvement (0.531 → 0.625)
-- **Privacy-Utility Score**: +18.8% improvement with maximum privacy emphasis (λ=1.0)
 
 ### **Adversarial Resistance Validation**
 
@@ -177,7 +173,7 @@ Based on empirical validation across multiple experimental sessions with 30-tria
 ### **Statistical Significance & Robustness**
 
 #### **Multi-Trial Validation:**
-- **Sample Size**: 130 total trials across 2 independent sessions
+- **Sample Size**: 1000 total trials across 2 independent sessions
 - **Reproducibility**: Consistent results across different medical conditions
 - **Statistical Power**: Large effect sizes with minimal variance
 - **Clinical Diversity**: Tested across mental health, chronic diseases, and acute conditions
@@ -199,12 +195,6 @@ Agent A (Diagnosis) → Agent B (Treatment) → Agent C (Pricing)
 2. **Access Control**: RI filtering between agent transitions  
 3. **Message Log Protection**: Prevents sensitive data accumulation
 
-### Technical Stack
-- **Python 3.8+**: Core implementation language
-- **LangChain/LangGraph**: Multi-agent workflow framework
-- **OpenAI GPT-4**: LLM reasoning and adversarial testing
-- **Streamlit**: Experimental interface and visualization
-- **Plotly**: Advanced privacy-utility visualizations
 
 ## Use Case: Medical Diagnosis Workflow
 

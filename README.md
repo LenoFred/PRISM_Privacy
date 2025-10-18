@@ -129,7 +129,7 @@ Each experiment log contains:
 
 ### **Comprehensive Multi-Session Analysis**
 
-Based on empirical validation across multiple experimental sessions with 30-trial and 100-trial comparative studies:
+Based on empirical validation across multiple experimental sessions with comparative studies:
 
 #### **Session 1 Results (20250930_161919)**
 | Scenario | ER (%) | TSR (%) | RSL (steps) | Semantic Fidelity | Privacy-Utility Score |

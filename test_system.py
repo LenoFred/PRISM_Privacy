@@ -18,11 +18,11 @@ def test_api_connection():
     provider = config.LLM_PROVIDER.lower()
     if provider == "openai":
         if not config.OPENAI_API_KEY or config.OPENAI_API_KEY == "your_openai_api_key_here":
-            print("❌ Please set your OPENAI_API_KEY in the .env file")
+            print(" Please set your OPENAI_API_KEY in the .env file")
             return False
     elif provider == "hf":
         if not config.HF_TOKEN or config.HF_TOKEN == "your_hf_token_here":
-            print("❌ Please set your HF_TOKEN in the .env file")
+            print(" Please set your HF_TOKEN in the .env file")
             return False
     
     try:
@@ -31,11 +31,11 @@ def test_api_connection():
         # Simple test call
         from langchain_core.messages import HumanMessage
         response = llm.invoke([HumanMessage(content="Hello, this is a test. Please respond with 'Test successful'.")])
-        print(f"✅ API connection successful: {response.content}")
+        print(f" API connection successful: {response.content}")
         return True
         
     except Exception as e:
-        print(f"❌ API connection failed: {e}")
+        print(f" API connection failed: {e}")
         return False
 
 def test_semantic_minimization():
@@ -56,12 +56,12 @@ def test_semantic_minimization():
         
         # Validate
         is_valid = prism_logic.validate_semantic_minimization(test_input, minimized)
-        print(f"✅ Semantic minimization validation: {'PASSED' if is_valid else 'FAILED'}")
+        print(f" Semantic minimization validation: {'PASSED' if is_valid else 'FAILED'}")
         
         return is_valid
         
     except Exception as e:
-        print(f"❌ Semantic minimization test failed: {e}")
+        print(f" Semantic minimization test failed: {e}")
         return False
 
 def test_restricted_information():
@@ -113,14 +113,14 @@ def test_restricted_information():
             access_violations.append("Sensitive data leaked to agents")
         
         if access_violations:
-            print(f"❌ Access control violations: {'; '.join(access_violations)}")
+            print(f" Access control violations: {'; '.join(access_violations)}")
             return False
         else:
-            print("✅ Restricted Information (RI) access control: PASSED")
+            print(" Restricted Information (RI) access control: PASSED")
             return True
             
     except Exception as e:
-        print(f"❌ Restricted Information test failed: {e}")
+        print(f" Restricted Information test failed: {e}")
         return False
 
 def test_adversary_prober():
@@ -171,11 +171,11 @@ def test_adversary_prober():
         print(f"PRISM adversary reconstruction: {prism_reconstruction}")
         print(f"PRISM exfiltration successful: {prism_exfiltration}")
         
-        print("✅ Adversary prober test: PASSED")
+        print(" Adversary prober test: PASSED")
         return True
         
     except Exception as e:
-        print(f"❌ Adversary prober test failed: {e}")
+        print(f" Adversary prober test failed: {e}")
         return False
 
 def test_task_success_evaluation():
@@ -198,14 +198,14 @@ def test_task_success_evaluation():
         print(f"Unsuccessful output evaluation: {failure_result}")
         
         if success_result and not failure_result:
-            print("✅ Task success evaluation: PASSED")
+            print(" Task success evaluation: PASSED")
             return True
         else:
-            print("❌ Task success evaluation: FAILED")
+            print(" Task success evaluation: FAILED")
             return False
             
     except Exception as e:
-        print(f"❌ Task success evaluation test failed: {e}")
+        print(f" Task success evaluation test failed: {e}")
         return False
 
 def test_sensitive_component_extraction():
@@ -226,14 +226,14 @@ def test_sensitive_component_extraction():
         if (condition == expected_condition and 
             treatment_id == expected_treatment and 
             patient_id == expected_patient_id):
-            print("✅ Sensitive component extraction: PASSED")
+            print(" Sensitive component extraction: PASSED")
             return True
         else:
-            print("❌ Sensitive component extraction: FAILED")
+            print(" Sensitive component extraction: FAILED")
             return False
             
     except Exception as e:
-        print(f"❌ Sensitive component extraction test failed: {e}")
+        print(f" Sensitive component extraction test failed: {e}")
         return False
 
 def test_unit_of_meaningfulness():
@@ -254,24 +254,24 @@ def test_unit_of_meaningfulness():
         # Validate UoM properties
         # Should not contain original sensitive info
         if condition in uom or patient_id in uom:
-            print("❌ UoM contains sensitive information")
+            print(" UoM contains sensitive information")
             return False
         
         # Should contain treatment ID for utility
         if treatment_id not in uom:
-            print("❌ UoM missing treatment ID (utility loss)")
+            print(" UoM missing treatment ID (utility loss)")
             return False
         
         # Should contain generic categories
         if "Chronic Ailment Category" not in uom or "PID_Hashed" not in uom:
-            print("❌ UoM missing expected generic terms")
+            print(" UoM missing expected generic terms")
             return False
         
-        print("✅ Unit of Meaningfulness creation: PASSED")
+        print(" Unit of Meaningfulness creation: PASSED")
         return True
         
     except Exception as e:
-        print(f"❌ Unit of Meaningfulness test failed: {e}")
+        print(f" Unit of Meaningfulness test failed: {e}")
         return False
 
 def test_graph_execution():
@@ -301,16 +301,16 @@ def test_graph_execution():
         print(f"PRISM messages count: {len(prism_result.get('messages', []))}")
         print(f"PRISM final output preview: {prism_result.get('final_output', '')[:100]}...")
         
-        print("✅ Graph execution successful")
+        print(" Graph execution successful")
         return True
         
     except Exception as e:
-        print(f"❌ Graph execution failed: {e}")
+        print(f" Graph execution failed: {e}")
         return False
 
 def main():
     """Run all tests."""
-    print("🔐 PRISM Framework - Comprehensive System Validation Tests")
+    print(" PRISM Framework - Comprehensive System Validation Tests")
     print("=" * 60)
     
     # Core functionality tests
@@ -331,77 +331,77 @@ def main():
     
     all_results = []
     
-    print("\n📋 CORE FUNCTIONALITY TESTS")
+    print("\n CORE FUNCTIONALITY TESTS")
     print("-" * 40)
     core_results = []
     for test_name, test_func in core_tests:
-        print(f"\n🔧 {test_name}:")
+        print(f"\n {test_name}:")
         try:
             result = test_func()
             core_results.append(result)
             all_results.append(result)
         except Exception as e:
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f" {test_name} failed with exception: {e}")
             core_results.append(False)
             all_results.append(False)
     
     print(f"\nCore Tests Summary: {sum(core_results)}/{len(core_results)} passed")
     
-    print("\n🚀 ADVANCED FUNCTIONALITY TESTS")
+    print("\n ADVANCED FUNCTIONALITY TESTS")
     print("-" * 40)
     advanced_results = []
     for test_name, test_func in advanced_tests:
-        print(f"\n🔬 {test_name}:")
+        print(f"\n {test_name}:")
         try:
             result = test_func()
             advanced_results.append(result)
             all_results.append(result)
         except Exception as e:
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f" {test_name} failed with exception: {e}")
             advanced_results.append(False)
             all_results.append(False)
     
     print(f"\nAdvanced Tests Summary: {sum(advanced_results)}/{len(advanced_results)} passed")
     
     print("\n" + "=" * 60)
-    print("🎯 FINAL TEST SUMMARY:")
+    print(" FINAL TEST SUMMARY:")
     print(f"Core Functionality: {sum(core_results)}/{len(core_results)} passed")
     print(f"Advanced Functionality: {sum(advanced_results)}/{len(advanced_results)} passed")
     print(f"Overall: {sum(all_results)}/{len(all_results)} passed")
     
     if all(all_results):
-        print("\n✅ ALL TESTS PASSED! 🎉")
-        print("🚀 PRISM Framework is fully validated and ready for experimentation.")
+        print("\n ALL TESTS PASSED!")
+        print(" PRISM Framework is fully validated and ready for experimentation.")
         print("\nTo run the full Streamlit application:")
         print("   streamlit run main.py")
         print("\nTo run specific module tests:")
         print("   python -c \"import metrics; metrics.test_adversary_prober()\"")
         print("   python -c \"import metrics; metrics.test_task_success_evaluation()\"")
     else:
-        print("\n❌ SOME TESTS FAILED!")
-        print("🔧 Please check the configuration and resolve issues before proceeding.")
+        print("\n SOME TESTS FAILED!")
+        print(" Please check the configuration and resolve issues before proceeding.")
         
         # Provide specific guidance based on which tests failed
         if not all(core_results):
-            print("\n🚨 CORE FUNCTIONALITY ISSUES:")
+            print("\n CORE FUNCTIONALITY ISSUES:")
             failed_core = [name for (name, _), result in zip(core_tests, core_results) if not result]
             for failed in failed_core:
                 print(f"   - {failed}")
         
         if not all(advanced_results):
-            print("\n⚠️  ADVANCED FUNCTIONALITY ISSUES:")
+            print("\n  ADVANCED FUNCTIONALITY ISSUES:")
             failed_advanced = [name for (name, _), result in zip(advanced_tests, advanced_results) if not result]
             for failed in failed_advanced:
                 print(f"   - {failed}")
         
-        print("\n📋 TROUBLESHOOTING CHECKLIST:")
-        print("1. ✅ Set your LLM API key in the .env file:")
+        print("\n TROUBLESHOOTING CHECKLIST:")
+        print("1.  Set your LLM API key in the .env file:")
         print("   - For OpenAI: Set OPENAI_API_KEY and LLM_PROVIDER=openai")
         print("   - For HuggingFace: Set HF_TOKEN and LLM_PROVIDER=hf")
-        print("2. ✅ Verify internet connection for API calls")
-        print("3. ✅ Check sufficient API credits/quota")
-        print("4. ✅ Ensure all dependencies are installed: pip install -r requirements.txt")
-        print("5. ✅ Verify .env file is in the correct directory")
+        print("2.  Verify internet connection for API calls")
+        print("3.  Check sufficient API credits/quota")
+        print("4.  Ensure all dependencies are installed: pip install -r requirements.txt")
+        print("5.  Verify .env file is in the correct directory")
 
 if __name__ == "__main__":
     main()

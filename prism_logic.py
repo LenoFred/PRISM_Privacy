@@ -147,25 +147,25 @@ def validate_semantic_minimization(original: str, minimized: str) -> bool:
     # Check that specific conditions are not present
     for condition in config.SENSITIVE_CONDITIONS:
         if condition.lower() in minimized_lower:
-            print(f"❌ Validation failed: Found sensitive condition '{condition}' in minimized text")
+            print(f" Validation failed: Found sensitive condition '{condition}' in minimized text")
             return False
     
     # Check that specific patient IDs are not present
     for patient_id in config.PATIENT_IDS:
         if patient_id.lower() in minimized_lower:
-            print(f"❌ Validation failed: Found sensitive patient ID '{patient_id}' in minimized text")
+            print(f" Validation failed: Found sensitive patient ID '{patient_id}' in minimized text")
             return False
     
     # Check that treatment IDs are still present (utility preservation)
     has_treatment = any(treatment.lower() in minimized_lower for treatment in config.TREATMENT_IDS)
     
     if not has_treatment:
-        print(f"❌ Validation failed: No treatment ID found in minimized text")
+        print(f" Validation failed: No treatment ID found in minimized text")
         print(f"Expected one of: {config.TREATMENT_IDS}")
         print(f"Minimized text: {minimized}")
         return False
     
-    print(f"✅ Validation passed: Sensitive info removed, treatment ID preserved")
+    print(f" Validation passed: Sensitive info removed, treatment ID preserved")
     return has_treatment
 
 
